@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マイクラWEB版 - 完全版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            user-select: none;
+        }
+        
+        #gameCanvas {
+            display: block;
+            cursor: none;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+        }
+        
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+        }
+        
+        #crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 9px;
+            top: 0;
+        }
+        
+        #crosshair::after {
+            width: 20px;
+            height: 2px;
+            left: 0;
+            top: 9px;
+        }
+        
+        #hotbar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .slot {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            position: relative;
+            transition: transform 0.1s;
+        }
+        
+        .slot.active {
+            border-color: #ffff00;
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+        }
+        
+        .slot-number {
+            position: absolute;
+            bottom: 2px;
+            left: 4px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-size: 14px;
+            line-height: 1.6;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 300px;
+        }
+        
+        #info h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #4ade80;
+        }
+        
+        #info .key {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        
+        #blockHighlight {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+        
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            display: none;
+            pointer-events: auto;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            min-width: 400px;
+        }
+        
+        #menu h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: #4ade80;
+        }
+        
+        .menu-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .menu-btn:active {
+            transform: translateY(0);
+        }
+        
+        #coordinates {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #4ade80;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #saveStatus {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #4ade80;
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        
+        #saveStatus.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div id="crosshair"></div>
+        
+        <div id="info">
+            <h1>⛏️ マイクラWEB版</h1>
+            <p><span class="key">WASD</span> - 移動</p>
+            <p><span class="key">Space</span> - ジャンプ (2回で飛行)</p>
+            <p><span class="key">Shift</span> - しゃがみ/下降</p>
+            <p><span class="key">左クリック</span> - ブロック破壊</p>
+            <p><span class="key">右クリック</span> - ブロック設置</p>
+            <p><span class="key">1-9</span> - ブロック選択</p>
+            <p><span class="key">E</span> - メニュー</p>
+            <p><span class="key">Ctrl+S</span> - セーブ</p>
+            <p><span class="key">Ctrl+L</span> - ロード</p>
+            <p><span class="key">ESC</span> - マウス解放</p>
+        </div>
+        
+        <div id="coordinates">X: 0 Y: 0 Z: 0</div>
+        
+        <div id="hotbar">
+            <div class="slot active" data-type="grass">🌿<span class="slot-number">1</span></div>
+            <div class="slot" data-type="dirt">🟫<span class="slot-number">2</span></div>
+            <div class="slot" data-type="stone">🪨<span class="slot-number">3</span></div>
+            <div class="slot" data-type="wood">🪵<span class="slot-number">4</span></div>
+            <div class="slot" data-type="leaves">🍃<span class="slot-number">5</span></div>
+            <div class="slot" data-type="sand">🏖️<span class="slot-number">6</span></div>
+            <div class="slot" data-type="water">💧<span class="slot-number">7</span></div>
+            <div class="slot" data-type="lava">🌋<span class="slot-number">8</span></div>
+            <div class="slot" data-type="diamond">💎<span class="slot-number">9</span></div>
+        </div>
+        
+        <div id="saveStatus">💾 セーブしました！</div>
+        
+        <div id="menu">
+            <h2>メニュー</h2>
+            <button class="menu-btn" onclick="game.resume()">ゲームに戻る</button>
+            <button class="menu-btn" onclick="game.saveWorld()">世界をセーブ (Ctrl+S)</button>
+            <button class="menu-btn" onclick="game.loadWorld()">世界をロード (Ctrl+L)</button>
+            <button class="menu-btn" onclick="game.resetWorld()">新しい世界</button>
+            <button class="menu-btn" onclick="game.toggleFlight()">飛行モード切替</button>
+        </div>
+        
+        <div id="loading">
+            <div class="spinner"></div>
+            <p>世界を生成中...</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // マイクラWEB版 - 完全版
+        class VoxelGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.world = new Map();
+                this.chunks = new Map();
+                this.chunkSize = 16;
+                this.renderDistance = 4;
+                
+                this.player = {
+                    position: new THREE.Vector3(0, 20, 0),
+                    velocity: new THREE.Vector3(0, 0, 0),
+                    rotation: new THREE.Euler(0, 0, 0),
+                    onGround: false,
+                    flying: false,
+                    speed: 0.1,
+                    jumpSpeed: 0.25,
+                    height: 1.8,
+                    width: 0.6
+                };
+                
+                this.keys = {};
+                this.mouse = { x: 0, y: 0, locked: false };
+                this.selectedBlock = 0;
+                this.highlightMesh = null;
+                this.raycaster = new THREE.Raycaster();
+                this.clock = new THREE.Clock();
+                
+                this.blockTypes = [
+                    { name: 'grass', color: 0x7cfc00, texture: 'grass' },
+                    { name: 'dirt', color: 0x8b4513, texture: 'dirt' },
+                    { name: 'stone', color: 0x808080, texture: 'stone' },
+                    { name: 'wood', color: 0x8b5a2b, texture: 'wood' },
+                    { name: 'leaves', color: 0x228b22, texture: 'leaves', transparent: true },
+                    { name: 'sand', color: 0xf4a460, texture: 'sand' },
+                    { name: 'water', color: 0x1e90ff, texture: 'water', transparent: true, opacity: 0.7 },
+                    { name: 'lava', color: 0xff4500, texture: 'lava', light: true },
+                    { name: 'diamond', color: 0x00ffff, texture: 'diamond' }
+                ];
+                
+                this.materials = {};
+                this.geometry = new THREE.BoxGeometry(1, 1, 1);
+                
+                this.init();
+            }
+            
+            init() {
+                // シーン設定
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87ceeb);
+                this.scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
+                
+                // カメラ設定
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.copy(this.player.position);
+                
+                // レンダラー設定
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: this.canvas,
+                    antialias: true
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                // 照明
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 100, 50);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.camera.left = -50;
+                directionalLight.shadow.camera.right = 50;
+                directionalLight.shadow.camera.top = 50;
+                directionalLight.shadow.camera.bottom = -50;
+                directionalLight.shadow.camera.near = 0.1;
+                directionalLight.shadow.camera.far = 200;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                this.scene.add(directionalLight);
+                
+                // マテリアル生成
+                this.generateMaterials();
+                
+                // ハイライトメッシュ
+                const highlightGeo = new THREE.BoxGeometry(1.05, 1.05, 1.05);
+                const highlightMat = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                this.highlightMesh = new THREE.Mesh(highlightGeo, highlightMat);
+                this.scene.add(this.highlightMesh);
+                this.highlightMesh.visible = false;
+                
+                // イベントリスナー
+                this.setupEventListeners();
+                
+                // 世界生成
+                this.generateWorld();
+                
+                // ロード完了
+                document.getElementById('loading').style.display = 'none';
+                
+                // ゲームループ開始
+                this.animate();
+            }
+            
+            generateMaterials() {
+                this.blockTypes.forEach((type, index) => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 64;
+                    canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // ベースカラー
+                    ctx.fillStyle = '#' + type.color.toString(16).padStart(6, '0');
+                    ctx.fillRect(0, 0, 64, 64);
+                    
+                    // テクスチャパターン
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                    for (let i = 0; i < 8; i++) {
+                        for (let j = 0; j < 8; j++) {
+                            if (Math.random() > 0.5) {
+                                ctx.fillRect(i * 8, j * 8, 8, 8);
+                            }
+                        }
+                    }
+                    
+                    // 特殊テクスチャ
+                    if (type.name === 'grass') {
+                        ctx.fillStyle = '#228b22';
+                        ctx.fillRect(0, 0, 64, 10);
+                        ctx.fillStyle = '#8b4513';
+                        ctx.fillRect(0, 54, 64, 10);
+                    } else if (type.name === 'wood') {
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                        for (let i = 0; i < 64; i += 8) {
+                            ctx.fillRect(i, 0, 2, 64);
+                        }
+                    }
+                    
+                    const texture = new THREE.CanvasTexture(canvas);
+                    texture.magFilter = THREE.NearestFilter;
+                    texture.minFilter = THREE.NearestFilter;
+                    
+                    this.materials[index] = new THREE.MeshLambertMaterial({
+                        map: texture,
+                        transparent: type.transparent || false,
+                        opacity: type.opacity || 1.0
+                    });
+                });
+            }
+            
+            generateWorld() {
+                // 地形生成（パーリンノイズ風）
+                const size = 32;
+                const height = 16;
+                
+                for (let x = -size; x < size; x++) {
+                    for (let z = -size; z < size; z++) {
+                        // 簡易的な地形生成
+                        const noise = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 5 + 
+                                     Math.sin(x * 0.3) * Math.sin(z * 0.3) * 2;
+                        const groundHeight = Math.floor(height + noise);
+                        
+                        for (let y = 0; y <= groundHeight; y++) {
+                            let blockType = 1; // dirt
+                            
+                            if (y === groundHeight) {
+                                blockType = 0; // grass
+                            } else if (y > groundHeight - 3) {
+                                blockType = 1; // dirt
+                            } else {
+                                blockType = 2; // stone
+                            }
+                            
+                            // 洞窟
+                            if (y < groundHeight - 5 && Math.random() > 0.95) {
+                                continue;
+                            }
+                            
+                            // 鉱石
+                            if (y < 10 && Math.random() > 0.98) {
+                                blockType = 8; // diamond
+                            }
+                            
+                            this.setBlock(x, y, z, blockType);
+                        }
+                        
+                        // 水
+                        if (groundHeight < 12) {
+                            for (let y = groundHeight + 1; y <= 12; y++) {
+                                this.setBlock(x, y, z, 6); // water
+                            }
+                        }
+                        
+                        // 木
+                        if (Math.random() > 0.98 && groundHeight > 10) {
+                            this.generateTree(x, groundHeight + 1, z);
+                        }
+                    }
+                }
+            }
+            
+            generateTree(x, y, z) {
+                const height = 4 + Math.floor(Math.random() * 3);
+                
+                // 幹
+                for (let i = 0; i < height; i++) {
+                    this.setBlock(x, y + i, z, 3); // wood
+                }
+                
+                // 葉
+                for (let lx = -2; lx <= 2; lx++) {
+                    for (let lz = -2; lz <= 2; lz++) {
+                        for (let ly = height - 2; ly < height + 1; ly++) {
+                            if (Math.abs(lx) + Math.abs(lz) + Math.abs(ly - height) < 4) {
+                                if (lx !== 0 || lz !== 0 || ly >= height) {
+                                    this.setBlock(x + lx, y + ly, z + lz, 4); // leaves
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            setBlock(x, y, z, type) {
+                const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+                
+                if (type === 0) {
+                    this.removeBlock(x, y, z);
+                    return;
+                }
+                
+                if (this.world.has(key)) {
+                    const existing = this.world.get(key);
+                    if (existing.type === type) return;
+                    this.scene.remove(existing.mesh);
+                }
+                
+                const material = this.materials[type - 1];
+                const mesh = new THREE.Mesh(this.geometry, material);
+                mesh.position.set(Math.floor(x), Math.floor(y), Math.floor(z));
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                this.scene.add(mesh);
+                this.world.set(key, { type, mesh, x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) });
+            }
+            
+            removeBlock(x, y, z) {
+                const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+                if (this.world.has(key)) {
+                    const block = this.world.get(key);
+                    this.scene.remove(block.mesh);
+                    this.world.delete(key);
+                    
+                    // 破壊パーティクル
+                    this.createParticles(x, y, z, block.type);
+                }
+            }
+            
+            createParticles(x, y, z, type) {
+                const particleCount = 8;
+                const material = this.materials[type - 1];
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+                    const mesh = new THREE.Mesh(geo, material);
+                    mesh.position.set(x + Math.random() - 0.5, y + Math.random() - 0.5, z + Math.random() - 0.5);
+                    
+                    const velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.2,
+                        Math.random() * 0.2,
+                        (Math.random() - 0.5) * 0.2
+                    );
+                    
+                    this.scene.add(mesh);
+                    
+                    // パーティクルアニメーション
+                    const animate = () => {
+                        mesh.position.add(velocity);
+                        velocity.y -= 0.01;
+                        mesh.rotation.x += 0.1;
+                        mesh.rotation.y += 0.1;
+                        mesh.scale.multiplyScalar(0.95);
+                        
+                        if (mesh.scale.x > 0.01) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            this.scene.remove(mesh);
+                        }
+                    };
+                    animate();
+                }
+            }
+            
+            getBlock(x, y, z) {
+                const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+                return this.world.get(key) || null;
+            }
+            
+            setupEventListeners() {
+                // キーボード
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    
+                    // 数字キーでブロック選択
+                    if (e.code >= 'Digit1' && e.code <= 'Digit9') {
+                        this.selectBlock(parseInt(e.code[5]) - 1);
+                    }
+                    
+                    // Eキーでメニュー
+                    if (e.code === 'KeyE') {
+                        this.toggleMenu();
+                    }
+                    
+                    // Ctrl+Sでセーブ
+                    if (e.code === 'KeyS' && e.ctrlKey) {
+                        e.preventDefault();
+                        this.saveWorld();
+                    }
+                    
+                    // Ctrl+Lでロード
+                    if (e.code === 'KeyL' && e.ctrlKey) {
+                        e.preventDefault();
+                        this.loadWorld();
+                    }
+                    
+                    // ダブルジャンプで飛行
+                    if (e.code === 'Space' && !this.player.flying) {
+                        const now = Date.now();
+                        if (now - this.lastJump < 300) {
+                            this.player.flying = true;
+                            this.showSaveStatus('飛行モード ON');
+                        }
+                        this.lastJump = now;
+                    }
+                    
+                    // 飛行中の下降
+                    if (e.code === 'ShiftLeft' && this.player.flying) {
+                        this.player.velocity.y = -0.2;
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+                
+                // マウスロック
+                this.canvas.addEventListener('click', () => {
+                    if (!this.mouse.locked && !document.getElementById('menu').style.display) {
+                        this.canvas.requestPointerLock();
+                    }
+                });
+                
+                document.addEventListener('pointerlockchange', () => {
+                    this.mouse.locked = document.pointerLockElement === this.canvas;
+                });
+                
+                // マウス移動
+                document.addEventListener('mousemove', (e) => {
+                    if (this.mouse.locked) {
+                        this.player.rotation.y -= e.movementX * 0.002;
+                        this.player.rotation.x -= e.movementY * 0.002;
+                        this.player.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.player.rotation.x));
+                    }
+                });
+                
+                // クリック
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (!this.mouse.locked) return;
+                    
+                    if (e.button === 0) {
+                        // 左クリック - 破壊
+                        this.breakBlock();
+                    } else if (e.button === 2) {
+                        // 右クリック - 設置
+                        this.placeBlock();
+                    }
+                });
+                
+                // コンテキストメニュー無効化
+                this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                // リサイズ
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                this.lastJump = 0;
+            }
+            
+            selectBlock(index) {
+                this.selectedBlock = index;
+                document.querySelectorAll('.slot').forEach((slot, i) => {
+                    slot.classList.toggle('active', i === index);
+                });
+            }
+            
+            breakBlock() {
+                const intersect = this.getTargetBlock();
+                if (intersect) {
+                    const pos = intersect.object.position;
+                    this.removeBlock(pos.x, pos.y, pos.z);
+                }
+            }
+            
+            placeBlock() {
+                const intersect = this.getTargetBlock();
+                if (intersect) {
+                    const normal = intersect.face.normal;
+                    const pos = intersect.object.position.clone().add(normal);
+                    
+                    // プレイヤーとの衝突チェック
+                    const playerPos = this.player.position;
+                    if (Math.abs(pos.x - playerPos.x) < 0.8 && 
+                        Math.abs(pos.z - playerPos.z) < 0.8 &&
+                        pos.y > playerPos.y - 1 && pos.y < playerPos.y + 1) {
+                        return;
+                    }
+                    
+                    this.setBlock(pos.x, pos.y, pos.z, this.selectedBlock + 1);
+                }
+            }
+            
+            getTargetBlock() {
+                const direction = new THREE.Vector3(0, 0, -1);
+                direction.applyEuler(this.player.rotation);
+                
+                this.raycaster.set(this.camera.position, direction);
+                this.raycaster.far = 5;
+                
+                const meshes = Array.from(this.world.values()).map(b => b.mesh);
+                const intersects = this.raycaster.intersectObjects(meshes);
+                
+                if (intersects.length > 0) {
+                    const intersect = intersects[0];
+                    this.highlightMesh.position.copy(intersect.object.position);
+                    this.highlightMesh.visible = true;
+                    return intersect;
+                } else {
+                    this.highlightMesh.visible = false;
+                    return null;
+                }
+            }
+            
+            updatePhysics() {
+                const delta = this.clock.getDelta();
+                
+                // 移動方向
+                const moveSpeed = this.keys['ShiftLeft'] ? this.player.speed * 2 : this.player.speed;
+                const forward = new THREE.Vector3(0, 0, -1);
+                forward.applyEuler(new THREE.Euler(0, this.player.rotation.y, 0));
+                const right = new THREE.Vector3(1, 0, 0);
+                right.applyEuler(new THREE.Euler(0, this.player.rotation.y, 0));
+                
+                let moveX = 0;
+                let moveZ = 0;
+                
+                if (this.keys['KeyW']) {
+                    moveX += forward.x * moveSpeed;
+                    moveZ += forward.z * moveSpeed;
+                }
+                if (this.keys['KeyS']) {
+                    moveX -= forward.x * moveSpeed;
+                    moveZ -= forward.z * moveSpeed;
+                }
+                if (this.keys['KeyA']) {
+                    moveX -= right.x * moveSpeed;
+                    moveZ -= right.z * moveSpeed;
+                }
+                if (this.keys['KeyD']) {
+                    moveX += right.x * moveSpeed;
+                    moveZ += right.z * moveSpeed;
+                }
+                
+                // 飛行モード
+                if (this.player.flying) {
+                    this.player.velocity.y = 0;
+                    if (this.keys['Space']) this.player.velocity.y = moveSpeed;
+                    if (this.keys['ShiftLeft']) this.player.velocity.y = -moveSpeed;
+                    
+                    this.player.position.x += moveX;
+                    this.player.position.z += moveZ;
+                    this.player.position.y += this.player.velocity.y;
+                } else {
+                    // 通常の物理
+                    this.player.velocity.y -= 0.01; // 重力
+                    
+                    // 水平移動
+                    this.player.position.x += moveX;
+                    this.checkCollision('x');
+                    this.player.position.z += moveZ;
+                    this.checkCollision('z');
+                    
+                    // 垂直移動
+                    this.player.position.y += this.player.velocity.y;
+                    this.checkCollision('y');
+                    
+                    // ジャンプ
+                    if (this.keys['Space'] && this.player.onGround) {
+                        this.player.velocity.y = this.player.jumpSpeed;
+                        this.player.onGround = false;
+                    }
+                }
+                
+                // カメラ更新
+                this.camera.position.copy(this.player.position);
+                this.camera.rotation.copy(this.player.rotation);
+                
+                // 座標表示更新
+                document.getElementById('coordinates').textContent = 
+                    `X: ${Math.floor(this.player.position.x)} Y: ${Math.floor(this.player.position.y)} Z: ${Math.floor(this.player.position.z)}`;
+                
+                // 落下死
+                if (this.player.position.y < -20) {
+                    this.player.position.set(0, 20, 0);
+                    this.player.velocity.set(0, 0, 0);
+                    this.showSaveStatus('落下死！リスポーンしました');
+                }
+            }
+            
+            checkCollision(axis) {
+                const x = Math.floor(this.player.position.x);
+                const y = Math.floor(this.player.position.y);
+                const z = Math.floor(this.player.position.z);
+                
+                // 周囲のブロックをチェック
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = 0; dy <= 2; dy++) {
+                        for (let dz = -1; dz <= 1; dz++) {
+                            const block = this.getBlock(x + dx, y + dy, z + dz);
+                            if (block && block.type !== 6) { // 水は無視
+                                const bx = x + dx;
+                                const by = y + dy;
+                                const bz = z + dz;
+                                
+                                if (this.player.position.x > bx - 0.3 && this.player.position.x < bx + 1.3 &&
+                                    this.player.position.z > bz - 0.3 && this.player.position.z < bz + 1.3 &&
+                                    this.player.position.y > by - 0.1 && this.player.position.y < by + 1.8) {
+                                    
+                                    if (axis === 'y') {
+                                        if (this.player.velocity.y < 0 && this.player.position.y > by + 0.5) {
+                                            this.player.position.y = by + 1.8;
+                                            this.player.velocity.y = 0;
+                                            this.player.onGround = true;
+                                        } else if (this.player.velocity.y > 0) {
+                                            this.player.position.y = by - 0.1;
+                                            this.player.velocity.y = 0;
+                                        }
+                                    } else if (axis === 'x') {
+                                        if (this.player.position.x > bx) {
+                                            this.player.position.x = bx + 1.3;
+                                        } else {
+                                            this.player.position.x = bx - 0.3;
+                                        }
+                                    } else if (axis === 'z') {
+                                        if (this.player.position.z > bz) {
+                                            this.player.position.z = bz + 1.3;
+                                        } else {
+                                            this.player.position.z = bz - 0.3;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            toggleMenu() {
+                const menu = document.getElementById('menu');
+                if (menu.style.display === 'block') {
+                    this.resume();
+                } else {
+                    menu.style.display = 'block';
+                    document.exitPointerLock();
+                }
+            }
+            
+            resume() {
+                document.getElementById('menu').style.display = 'none';
+                this.canvas.requestPointerLock();
+            }
+            
+            toggleFlight() {
+                this.player.flying = !this.player.flying;
+                this.showSaveStatus(this.player.flying ? '飛行モード ON' : '飛行モード OFF');
+                this.resume();
+            }
+            
+            saveWorld() {
+                const worldData = {
+                    blocks: Array.from(this.world.entries()).map(([key, value]) => ({
+                        key,
+                        type: value.type
+                    })),
+                    player: {
+                        position: this.player.position.toArray(),
+                        rotation: this.player.rotation.toArray()
+                    },
+                    timestamp: Date.now()
+                };
+                
+                localStorage.setItem('minecraftWebSave', JSON.stringify(worldData));
+                this.showSaveStatus('💾 セーブしました！');
+            }
+            
+            loadWorld() {
+                const saved = localStorage.getItem('minecraftWebSave');
+                if (!saved) {
+                    this.showSaveStatus('セーブデータがありません');
+                    return;
+                }
+                
+                const data = JSON.parse(saved);
+                
+                // 世界をクリア
+                this.world.forEach((block) => {
+                    this.scene.remove(block.mesh);
+                });
+                this.world.clear();
+                
+                // ブロックを復元
+                data.blocks.forEach(({key, type}) => {
+                    const [x, y, z] = key.split(',').map(Number);
+                    this.setBlock(x, y, z, type);
+                });
+                
+                // プレイヤー位置を復元
+                if (data.player) {
+                    this.player.position.fromArray(data.player.position);
+                    this.player.rotation.fromArray(data.player.rotation);
+                }
+                
+                this.showSaveStatus('📂 ロードしました！');
+                this.resume();
+            }
+            
+            resetWorld() {
+                this.world.forEach((block) => {
+                    this.scene.remove(block.mesh);
+                });
+                this.world.clear();
+                this.player.position.set(0, 20, 0);
+                this.player.velocity.set(0, 0, 0);
+                this.generateWorld();
+                this.showSaveStatus('新しい世界を生成しました');
+                this.resume();
+            }
+            
+            showSaveStatus(message) {
+                const status = document.getElementById('saveStatus');
+                status.textContent = message;
+                status.classList.add('show');
+                setTimeout(() => {
+                    status.classList.remove('show');
+                }, 2000);
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                if (!document.getElementById('menu').style.display) {
+                    this.updatePhysics();
+                    this.getTargetBlock();
+                }
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // ゲーム開始
+        const game = new VoxelGame();
+    </script>
+</body>
+</html>
